@@ -1,17 +1,21 @@
 #!/bin/bash
-# nhidb(운영중) 온라인 백업을 ssh 스트리밍으로 192.168.7.39:/root/db_backup 에 직접 전송
+# nhidb(운영중) 온라인 백업을 ssh 스트리밍으로 백업 서버에 직접 전송
+#   기본 대상: cubrid@192.168.7.39:/home/cubrid/db_backupdb
 set -u
 export CUBRID=/home/claude_user/CUBRID-11.4.5.1899-64e2b82-Linux.x86_64
 export CUBRID_DATABASES=$CUBRID/databases
 export PATH=$CUBRID/bin:$PATH
 export LD_LIBRARY_PATH=$CUBRID/lib:$CUBRID/cci/lib
-KEY=~/.ssh/nhidb_stream_key
-RHOST=root@192.168.7.39
+KEY=${KEY:-~/.ssh/nhidb_stream_key}
+RUSER=${RUSER:-cubrid}                             # 백업 서버 계정
+RHOST=${RHOST:-$RUSER@192.168.7.39}
+RDIR=${RDIR:-/home/cubrid/db_backupdb}             # 백업 서버 저장 경로
 SSHOPT="-i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
 WORK=/home/claude_user/test/remote_backup
 TS=$(date +%Y%m%d_%H%M%S)
-RFILE=/root/db_backup/nhidb_${TS}.bk
-FIFO=$WORK/nhidb_fifo
+RSUB=$RDIR/nhidb_${TS}                              # 회차별 디렉터리(충돌 방지)
+RFILE=$RSUB/nhidb_bk0v000                           # backupdb 기본 파일명과 동일
+FIFO=$WORK/nhidb_fifo_${TS}                         # 유니크 FIFO (-D 대상)
 LOG=$WORK/nhidb_stream.log
 VERB=$WORK/nhidb_backup_verbose.txt
 cd "$WORK"
@@ -21,7 +25,7 @@ rm -f "$FIFO"; mkfifo "$FIFO"
 log "[시작] nhidb 온라인 백업 -> ${RHOST}:${RFILE} (스트리밍)"
 
 # 1) 원격으로 FIFO 스트림 전송 (소비자)
-( cat "$FIFO" | ssh $SSHOPT $RHOST "cat > '$RFILE'"; echo $? > "$WORK/.ssh_rc" ) &
+( cat "$FIFO" | ssh $SSHOPT $RHOST "mkdir -p '$RSUB'; cat > '$RFILE'"; echo $? > "$WORK/.ssh_rc" ) &
 CONS=$!
 
 # 2) backupdb 로 FIFO 에 스트림 (온라인, level 0)

@@ -17,9 +17,10 @@ REMOTE_IP=${REMOTE_IP:-192.168.0.100}              # 백업 서버 IP
 REMOTE_PORT=${REMOTE_PORT:-9099}
 TIMEOUT=${TIMEOUT:-60}                             # 백업장비 무응답 허용 시간(초) -> 초과 시 backupdb 정지
 WORKDIR=${WORKDIR:-/home/claude_user/test/remote_backup}
-SPOOL=${SPOOL:-$WORKDIR/spool_${DB}.bkstream}      # 로컬 스풀(백업 크기만큼 여유 공간 필요)
+STAMP=${STAMP:-$(date +%m%d%H%M%S)}                # 유니크 suffix (동시/반복 실행 충돌 방지)
+SPOOL=${SPOOL:-$WORKDIR/spool_${DB}_${STAMP}.bkstream}   # 로컬 스풀(백업 크기만큼 여유 공간 필요)
 LOG=${LOG:-$WORKDIR/remote_backup.log}
-FIFO=$WORKDIR/bkfifo_${DB}
+FIFO=${FIFO:-$WORKDIR/bkfifo_${DB}_${STAMP}}       # 유니크 FIFO 경로 (-D 대상)
 CUBRID_BK_OPT=${CUBRID_BK_OPT:---no-check}         # 필요시 옵션 추가
 # ================================================
 
