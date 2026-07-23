@@ -1,0 +1,15 @@
+# build & runtime artifacts
+rbk_forward
+rbk_listener
+*.o
+*.log
+*.out
+spool_*
+*_fifo
+bkfifo_*
+mock*/
+verify_*/
+verify_iso_*/
+stage_*/
+recv/
+e2edb_data/
