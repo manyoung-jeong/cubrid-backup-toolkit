@@ -22,22 +22,31 @@ SPOOL=${SPOOL:-$WORKDIR/spool_${DB}_${STAMP}.bkstream}   # 로컬 스풀(백업 
 LOG=${LOG:-$WORKDIR/remote_backup.log}
 FIFO=${FIFO:-$WORKDIR/bkfifo_${DB}_${STAMP}}       # 유니크 FIFO 경로 (-D 대상)
 CUBRID_BK_OPT=${CUBRID_BK_OPT:---no-check}         # 필요시 옵션 추가
+SPOOL_MAX=${SPOOL_MAX:-2G}                         # 로컬 스풀 최대 크기(초과 시 오류 로그 남기고 백업 종료). 예: 2G, 512M, 1073741824
 # ================================================
 
 cd "$WORKDIR" || exit 1
 log(){ echo "$(date '+%F %T') [wrap] $*" | tee -a "$LOG"; }
 
+# SPOOL_MAX(2G/512M/... 또는 바이트) -> 바이트
+to_bytes(){ local v="$1"; case "$v" in
+    *G|*g) echo $(( ${v%[Gg]} * 1024*1024*1024 ));;
+    *M|*m) echo $(( ${v%[Mm]} * 1024*1024 ));;
+    *K|*k) echo $(( ${v%[Kk]} * 1024 ));;
+    *) echo "$v";; esac; }
+SPOOL_MAX_BYTES=$(to_bytes "$SPOOL_MAX")
+
 # 0) 포워더 빌드
 if [ ! -x ./rbk_forward ] || [ rbk_forward.c -nt ./rbk_forward ]; then
-    gcc -O2 -pthread -o rbk_forward rbk_forward.c || { log "rbk_forward 빌드 실패"; exit 1; }
+    gcc -O2 -std=gnu99 -pthread -o rbk_forward rbk_forward.c || { log "rbk_forward 빌드 실패"; exit 1; }
 fi
 
 # 1) FIFO/스풀 준비
 rm -f "$FIFO" "$SPOOL"; mkfifo "$FIFO" || { log "mkfifo 실패"; exit 1; }
-log "원격 백업 시작 DB=$DB level=$LEVEL -> ${REMOTE_IP}:${REMOTE_PORT} (timeout=${TIMEOUT}s)"
+log "원격 백업 시작 DB=$DB level=$LEVEL -> ${REMOTE_IP}:${REMOTE_PORT} (timeout=${TIMEOUT}s, spool_max=${SPOOL_MAX})"
 
-# 2) 포워더 기동 (FIFO 를 읽어 원격 전송)
-./rbk_forward "$REMOTE_IP" "$REMOTE_PORT" "$SPOOL" "$TIMEOUT" "$LOG" < "$FIFO" &
+# 2) 포워더 기동 (FIFO 를 읽어 원격 전송; 스풀 최대 크기 초과 시 exit 3)
+./rbk_forward "$REMOTE_IP" "$REMOTE_PORT" "$SPOOL" "$TIMEOUT" "$LOG" "$SPOOL_MAX_BYTES" < "$FIFO" &
 FWD=$!
 
 # 3) backupdb 기동 (FIFO 로 스트림)
@@ -56,8 +65,16 @@ done
 if [ "$FWD_RC" -eq 2 ]; then
     log "[오류] 백업 장비(${REMOTE_IP}:${REMOTE_PORT})가 ${TIMEOUT}초 이상 응답 없음 -> backupdb 정지"
     kill -TERM "$BK" 2>/dev/null; sleep 2; kill -KILL "$BK" 2>/dev/null; wait "$BK" 2>/dev/null
-    rm -f "$FIFO"
+    rm -f "$FIFO" "$SPOOL"
     exit 2
+fi
+
+# 5-1) 스풀 최대 크기 초과로 종료(3) -> backupdb 정지
+if [ "$FWD_RC" -eq 3 ]; then
+    log "[오류] 로컬 스풀 최대 크기(${SPOOL_MAX}) 초과 - 원격 전송이 백업 생성 속도를 못 따라감 -> backupdb 정지 (SPOOL_MAX 상향 또는 망/속도 점검)"
+    kill -TERM "$BK" 2>/dev/null; sleep 2; kill -KILL "$BK" 2>/dev/null; wait "$BK" 2>/dev/null
+    rm -f "$FIFO" "$SPOOL"
+    exit 3
 fi
 
 # 6) 정상 경로 : backupdb 종료 확인
