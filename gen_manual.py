@@ -138,6 +138,7 @@ bullet("송신측: CUBRID 환경변수, 대상 DB 준비, gcc(포워더 빌드).
 bullet("수신측: gcc(리스너 빌드) 또는 빌드된 rbk_listener. 방식 B 는 ssh 접근만 필요.")
 bullet("네트워크: 방식 A 는 전송 포트(기본 9099) 개방. 방식 B 는 22(ssh)만.")
 bullet("디스크: 방식 A 는 송신측에 백업 크기만큼 스풀 공간 필요. 방식 B 는 거의 불필요.")
+bullet("구버전 gcc(예: 4.8.x)는 C99 가 필요하므로 'gcc -O2 -std=gnu99 -o rbk_listener rbk_listener.c' 처럼 -std=gnu99 를 추가한다(포워더도 동일).")
 
 # ---- 5. 방식 A 상세 ----
 h("5. 방식 A 상세 (환경변수/동작/반환코드)")
@@ -197,6 +198,20 @@ h("9. 백업본 검증(복원)")
 para("원격 백업본이 실제 복원되는지 임시 위치에서 확인(운영 DB 와 무관).")
 code("cubrid restoredb -B <백업디렉토리> <DB>\ncubrid checkdb --SA-mode <DB>")
 para("e2e_test.sh 는 격리 DB 로 백업->전송->restoredb->checkdb->행수 일치까지 자동 검증한다.")
+
+h2("9.1 방식 A 실환경 검증 절차 (백업 서버로 종단 테스트)")
+para("방식 A 가 실제 백업 서버로 정상 동작하는지 종단 확인하는 절차. 예시는 백업 서버 192.168.7.39, 포트 9099, 스크래치 DB 사용.")
+step("1단계. 백업 서버에 리스너 빌드 + 실행")
+code('scp rbk_listener.c root@192.168.7.39:/root/db_backup/\nssh root@192.168.7.39 "cd /root/db_backup && gcc -O2 -std=gnu99 -o rbk_listener rbk_listener.c"\n# 수신 파일명은 <DB>_bk0v000 로 지정(복원 편의)\nssh root@192.168.7.39 "nohup /root/db_backup/rbk_listener 9099 /root/db_backup/<DB>_bk0v000 /root/db_backup/rbk.log >/dev/null 2>&1 &"')
+step("2단계. 포트 도달 확인")
+code('(cat < /dev/null > /dev/tcp/192.168.7.39/9099) && echo REACHABLE || echo UNREACHABLE\n# 참고: connection refused=리스너 미기동(도달은 됨), timeout=방화벽 차단')
+step("3단계. DB 서버에서 방식 A 실행")
+code('REMOTE_IP=192.168.7.39 REMOTE_PORT=9099 DB=<DB> LEVEL=0 TIMEOUT=60 \\\n  bash remote_backupdb.sh   # rc=0 이면 전송 성공')
+step("4단계. 검증 - 백업본을 받아 격리 복원 + checkdb (운영 DB 미변경)")
+code('mkdir -p ./fetch\nscp root@192.168.7.39:/root/db_backup/<DB>_bk0v000 ./fetch/\nISO=./iso; mkdir -p $ISO/vol\nprintf "%s\\t%s/vol\\tlocalhost\\t%s/vol\\tfile:%s/vol/lob\\n" <DB> $ISO $ISO $ISO > $ISO/databases.txt\nCUBRID_DATABASES=$ISO cubrid restoredb -u -p -B ./fetch <DB>\nCUBRID_DATABASES=$ISO cubrid checkdb --SA-mode <DB>')
+para("또는 자동: METHOD=dir BK_DIR=./fetch DB=<DB> bash realrun_verify.sh", color=GRAY, size=9.5)
+para("검증 예(2026-07-23): 스크래치 DB(300MB,2500행) -> 192.168.7.39:9099 전송, restoredb rc=0 / checkdb rc=0 / 행수 일치 -> PASS. 운영 서버 무영향.", bold=True)
+para("주의: 방식 A 는 (1)백업 서버에서 리스너 실행, (2)전송용 TCP 포트 개방, (3)송신측 로컬 스풀 공간(백업 크기만큼)이 필요하다.", color=GRAY, size=9.5)
 
 # ---- 9. 실제 사례 ----
 h("10. 실제 적용 사례 (검증됨)")

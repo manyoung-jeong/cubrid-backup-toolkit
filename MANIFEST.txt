@@ -2,8 +2,8 @@ CUBRID 백업 툴킷 - 구성 파일 목록
 =====================================
 [백업 스크립트]
   remote_backupdb.sh          방식 A: 재개형 원격 전송(로컬 스풀+이어받기+무응답 watchdog)
-  rbk_forward.c               방식 A 포워더(송신). gcc -O2 -pthread -o rbk_forward rbk_forward.c
-  rbk_listener.c              방식 A 리스너(수신). gcc -O2 -o rbk_listener rbk_listener.c
+  rbk_forward.c               방식 A 포워더(송신). gcc -O2 -std=gnu99 -pthread -o rbk_forward rbk_forward.c
+  rbk_listener.c              방식 A 리스너(수신). gcc -O2 -std=gnu99 -o rbk_listener rbk_listener.c   # 구버전 gcc(4.x) 대응
   stream_backup_nhidb.sh      방식 B 예시: ssh 스트리밍 직접 전송
   netbackup_cubrid_backup.sh  NetBackup 연동(스테이징 백업 후 bpbackup 수집)
   s3_cubrid_backup.sh         S3/오브젝트 스토리지 백업(aws s3 cp)
@@ -23,5 +23,5 @@ CUBRID 백업 툴킷 - 구성 파일 목록
   gen_manual.py / gen_nbu_guide.py / gen_checklist.py
 
 [빌드]
-  gcc -O2 -o rbk_listener rbk_listener.c
-  gcc -O2 -pthread -o rbk_forward rbk_forward.c
+  gcc -O2 -std=gnu99 -o rbk_listener rbk_listener.c   # 구버전 gcc(4.x) 대응
+  gcc -O2 -std=gnu99 -pthread -o rbk_forward rbk_forward.c
