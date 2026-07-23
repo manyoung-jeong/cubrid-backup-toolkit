@@ -84,6 +84,30 @@ bash e2e_test.sh
 ```
 - 저장 파일명은 backupdb 기본 규칙 `<DB>_bk0v000`. 복원: `cubrid restoredb -B <백업디렉터리> <DB>`.
 
+## SPOOL_MAX — 로컬 스풀 최대 크기 (중요)
+
+방식 A는 백업 스트림을 로컬 스풀(링 버퍼)에 잠시 담아 원격으로 보낸다. `SPOOL_MAX` 는 이 스풀이 쓸 수 있는 로컬 디스크 최대 크기다. 기본값 2G이며 **환경(백업 크기/디스크 여유/망 속도)에 맞게 조정**한다.
+
+- 로컬 디스크 사용은 `SPOOL_MAX` 를 절대 넘지 않는다(전송된 구간을 링 버퍼로 재사용).
+- 원격 전송이 backupdb 생성 속도를 지속적으로 못 따라가 미전송분이 `SPOOL_MAX` 를 넘으면, 오류를 로그에 남기고 백업을 종료한다(rc=3).
+- 표기: `2G`, `512M`, `1024K`, 또는 바이트 숫자. 미지정 시 `2G`. 최소 4MB.
+
+```
+# 기본 2G
+REMOTE_IP=<BACKUP_IP> REMOTE_PORT=9099 DB=<DB> LEVEL=0 bash remote_backupdb.sh
+
+# 스풀 여유를 크게 (대용량/느린 망 대비)
+SPOOL_MAX=10G REMOTE_IP=<BACKUP_IP> REMOTE_PORT=9099 DB=<DB> LEVEL=0 bash remote_backupdb.sh
+
+# 로컬 디스크가 빠듯할 때 작게
+SPOOL_MAX=512M REMOTE_IP=<BACKUP_IP> REMOTE_PORT=9099 DB=<DB> LEVEL=0 bash remote_backupdb.sh
+
+# 원스텝 래퍼(run_nhidb_A.sh)에도 그대로 전달
+SPOOL_MAX=5G bash run_nhidb_A.sh
+```
+- 초과로 종료되면 로그에 `[오류] 로컬 스풀 최대 크기(...) 초과 ... -> backupdb 정지` 가 남는다. 이때는 `SPOOL_MAX` 를 늘리거나, 망/전송 속도를 점검하거나, backupdb `--sleep-msecs` 로 생성 속도를 늦춘다.
+- 실측(2026-07-23): nhidb 약 35GB 전송을 `SPOOL_MAX=2G` 로 완주, 스풀 파일 최대 2G 유지, rc=0.
+
 ## backupdb 옵션 전체 예제
 
 파이프 백업은 `cubrid backupdb` 옵션을 대부분 사용할 수 있다. 방식 A는 `-D`(FIFO)/`-l`(LEVEL)을 스크립트가 지정하고 나머지는 `CUBRID_BK_OPT` 로, 방식 B는 명령에 직접 붙인다.
