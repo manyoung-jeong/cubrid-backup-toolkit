@@ -18,6 +18,7 @@ CUBRID 원격 백업 툴킷 - 구성 파일 목록
 
 [문서]
   백업방식_A_B_비교.md                 방식 A/B 비교표 + 선택 기준 + 실측(2026-07-23) 정리
+  backupdb_옵션_예제.md                cubrid backupdb 옵션 목록 + 파이프 백업 전체 옵션 예제
   원격백업_사용자매뉴얼.docx           사용자 매뉴얼(서버 설정/백업 실행 단계별 + 장비 유형별 연동)
   NetBackup_CUBRID_정책구성가이드.docx  NetBackup 관리자용 정책 구성 가이드
   실환경_백업검증_체크리스트.docx        S3/NFS/NetBackup 실환경 검증 체크리스트

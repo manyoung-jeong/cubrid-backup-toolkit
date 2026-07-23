@@ -69,14 +69,50 @@ rm -f $FIFO
 - 예시 스크립트 `stream_backup_nhidb.sh` 의 대상 계정/경로/DB만 바꿔 재사용 가능.
 
 ### 5. 백업본 검증(복원)
+운영 DB 와 무관한 격리 위치로 복원해 DB가 정상적으로 열리는지 확인한다.
 ```
-# 자동 검증: 대상 백업본을 격리 위치로 복원(restoredb -u -p) 후 checkdb
-METHOD=dir BK_DIR=<백업디렉터리> DB=<DB> bash realrun_verify.sh
+# 격리 위치로 복원 (restoredb -u -p 로 별도 CUBRID_DATABASES 경로에 복원)
+cubrid restoredb -u -p -B <백업디렉터리> <DB>
 
-# 또는 격리 종단 자체시험(스크래치 DB 로 백업->전송->복원->checkdb)
+# 복원된 DB 가 정상적으로 열리는지 standalone 접속으로 확인
+csql -S <DBname>
+
+# 자동 검증 스크립트(격리 복원 후 확인)
+METHOD=dir BK_DIR=<백업디렉터리> DB=<DB> bash realrun_verify.sh
 bash e2e_test.sh
 ```
 - 저장 파일명은 backupdb 기본 규칙 `<DB>_bk0v000`. 복원: `cubrid restoredb -B <백업디렉터리> <DB>`.
+
+## backupdb 옵션 전체 예제
+
+파이프 백업은 `cubrid backupdb` 옵션을 대부분 사용할 수 있다. 방식 A는 `-D`(FIFO)/`-l`(LEVEL)을 스크립트가 지정하고 나머지는 `CUBRID_BK_OPT` 로, 방식 B는 명령에 직접 붙인다.
+
+| 옵션 | 의미 | 파이프 백업 |
+|------|------|------|
+| `-D, --destination-path` | 백업 대상 경로 | 도구가 FIFO로 자동 지정 |
+| `-l, --level` (0/1/2) | 백업 레벨(0=full) | 가능(방식 A는 LEVEL 환경변수) |
+| `-C, --CS-mode` | 온라인(운영 중) 백업 | 가능(운영 기본/권장) |
+| `-S, --SA-mode` | 오프라인 백업 | DB 정지 시에만 |
+| `--no-check` | 무결성 검사 생략 | 가능(기본) |
+| `-t, --thread-count` | 스레드 수(0=auto) | 가능 |
+| `--no-compress` | 압축 안 함 | 가능(스트림이 원본 크기로 커짐) |
+| `--sleep-msecs=N` | 1MB당 N ms 대기(부하 조절) | 가능 |
+| `-r, --remove-archive` | 불필요 log-archive 삭제 | 가능(원본 영향, 주의) |
+| `-o, --output-file` | 상세 메시지 파일 출력 | 가능 |
+| `-k, --separate-keys` | TDE 키 파일 분리 | TDE 사용 시 |
+
+방식 A (옵션은 CUBRID_BK_OPT 로, -D/-l 은 스크립트가 지정):
+```
+REMOTE_IP=<BACKUP_IP> REMOTE_PORT=9099 DB=<DB> LEVEL=0 TIMEOUT=60 \
+  CUBRID_BK_OPT="-C --no-check -t 4 --sleep-msecs 5 -o backup_verbose.txt -r" \
+  bash remote_backupdb.sh
+```
+방식 B (직접):
+```
+cubrid backupdb -D $FIFO -l 0 -C --no-check -t 4 --sleep-msecs 5 \
+  -o nhidb_backup_verbose.txt -r <DB>
+```
+- 자세한 옵션 설명/주의사항은 `backupdb_옵션_예제.md` 참고.
 
 ## 반환코드 (remote_backupdb.sh / rbk_forward)
 - 0 : 백업 및 원격 전송 완료
