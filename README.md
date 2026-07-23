@@ -99,20 +99,20 @@ bash e2e_test.sh
 | `--sleep-msecs=N` | 1MB당 N ms 대기(부하 조절) | 가능 |
 | `-r, --remove-archive` | 불필요 log-archive 삭제 | 가능(원본 영향, 주의) |
 | `-o, --output-file` | 상세 메시지 파일 출력 | 가능 |
-| `-k, --separate-keys` | TDE 키 파일 분리 | TDE 사용 시 |
+| `-k, --separate-keys` | TDE 키 파일 분리 | 사용 불가(FIFO 대상 거부) |
 
-방식 A (옵션은 CUBRID_BK_OPT 로, -D/-l 은 스크립트가 지정):
+사용 가능한 옵션을 모두 넣은 예제(-k 제외). 방식 A (옵션은 CUBRID_BK_OPT 로, -D/-l 은 스크립트가 지정):
 ```
 REMOTE_IP=<BACKUP_IP> REMOTE_PORT=9099 DB=<DB> LEVEL=0 TIMEOUT=60 \
-  CUBRID_BK_OPT="-C --no-check -t 4 --sleep-msecs 5 -o backup_verbose.txt -r" \
+  CUBRID_BK_OPT="-C --no-check -t 4 --no-compress --sleep-msecs 5 -o backup_verbose.txt -r" \
   bash remote_backupdb.sh
 ```
 방식 B (직접):
 ```
-cubrid backupdb -D $FIFO -l 0 -C --no-check -t 4 --sleep-msecs 5 \
+cubrid backupdb -D $FIFO -l 0 -C --no-check -t 4 --no-compress --sleep-msecs 5 \
   -o nhidb_backup_verbose.txt -r <DB>
 ```
-- 자세한 옵션 설명/주의사항은 `backupdb_옵션_예제.md` 참고.
+- 검증(2026-07-23): 위 옵션들은 파이프 대상에서 rc=0 로 사용 가능. `-k`(separate-keys)만 사용 불가(CUBRID가 FIFO 대상 거부). 자세한 설명/주의는 `backupdb_옵션_예제.md` 참고.
 
 ## 반환코드 (remote_backupdb.sh / rbk_forward)
 - 0 : 백업 및 원격 전송 완료
