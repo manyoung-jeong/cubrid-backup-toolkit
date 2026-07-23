@@ -1,28 +1,26 @@
-CUBRID 백업 툴킷 - 구성 파일 목록
+CUBRID 원격 백업 툴킷 - 구성 파일 목록
 =====================================
+배포: cubrid_backup_toolkit.tar.gz 를 풀어 사용. 설치/설정/실행 절차는 README.md 참고.
+
 [백업 스크립트]
   remote_backupdb.sh          방식 A: 재개형 원격 전송(로컬 스풀+이어받기+무응답 watchdog). FIFO/스풀 유니크 suffix
-  run_nhidb_A.sh              방식 A 원스텝 래퍼(리스너 기동+포트확인+백업+결과확인). 회차 서브디렉터리 + 기본 파일명 <DB>_bk0v000
+  run_nhidb_A.sh              방식 A 원스텝 래퍼 예시(리스너 기동+포트확인+백업+결과확인). 회차 서브디렉터리 + 기본 파일명 <DB>_bk0v000
   rbk_forward.c               방식 A 포워더(송신). gcc -O2 -std=gnu99 -pthread -o rbk_forward rbk_forward.c
   rbk_listener.c              방식 A 리스너(수신). gcc -O2 -std=gnu99 -o rbk_listener rbk_listener.c   # 구버전 gcc(4.x) 대응
-  stream_backup_nhidb.sh      방식 B 예시: ssh 스트리밍 직접 전송. 회차 서브디렉터리 + 기본 파일명 nhidb_bk0v000
+  stream_backup_nhidb.sh      방식 B 예시: ssh 스트리밍 직접 전송. 회차 서브디렉터리 + 기본 파일명 <DB>_bk0v000
   netbackup_cubrid_backup.sh  NetBackup 연동(스테이징 백업 후 bpbackup 수집)
   s3_cubrid_backup.sh         S3/오브젝트 스토리지 백업(aws s3 cp)
   nfs_cubrid_backup.sh        NFS/CIFS NAS 백업(마운트 후 직접/스테이징)
 
-[종단 시험 / 검증]
-  e2e_test.sh                 방식 A/B 격리 종단 시험(백업->전송->복원->checkdb)
-  e2e_devices_test.sh         S3/NFS/NetBackup 격리 종단 시험(mock 대상)
-  realrun_verify.sh           실환경 자동 검증(백업->취득->격리복원->checkdb->PASS/FAIL)
+[검증]
+  realrun_verify.sh           실환경 자동 검증(백업->취득->격리복원 restoredb -u -p->checkdb->PASS/FAIL)
+  e2e_test.sh                 격리 종단 자체시험(스크래치 DB 로 백업->전송->복원->checkdb)
 
 [문서]
   백업방식_A_B_비교.md                 방식 A/B 비교표 + 선택 기준 + 실측(2026-07-23) 정리
   원격백업_사용자매뉴얼.docx           사용자 매뉴얼(서버 설정/백업 실행 단계별 + 장비 유형별 연동)
   NetBackup_CUBRID_정책구성가이드.docx  NetBackup 관리자용 정책 구성 가이드
   실환경_백업검증_체크리스트.docx        S3/NFS/NetBackup 실환경 검증 체크리스트
-
-[문서 생성기(재생성용)]
-  gen_manual.py / gen_nbu_guide.py / gen_checklist.py
 
 [빌드]
   gcc -O2 -std=gnu99 -o rbk_listener rbk_listener.c   # 구버전 gcc(4.x) 대응
